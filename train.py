@@ -38,6 +38,8 @@ parser.add_argument("--model_type", type=str, default="dummy", help="Model to tr
 parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
 parser.add_argument("--cell_size", type=int, default=256, help="RNN cell size.")
 parser.add_argument("--input_hidden_size", type=int, default=None, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--input_hidden_layers", type=int, default=None, help="Number of dense layers before rnn cell.")
+parser.add_argument("--input_dropout_rate", type=float, default=None, help="Dropout rate for input layer.")
 parser.add_argument("--activation_fn", type=str, default=None, help="Activation Function on the output.")
 
 # Training
@@ -66,6 +68,8 @@ def create_model(session):
     # Parse the commandline arguments to a more readable config.
     if ARGS.model_type == "dummy":
         model_cls, config, experiment_name = get_dummy_config(ARGS)
+    elif ARGS.model_type == 'rnn_spl':
+        model_cls, config, experiment_name = get_rnn_spl_config(ARGS)
     else:
         raise Exception("Model type '{}' unknown.".format(ARGS.model_type))
 
@@ -185,6 +189,48 @@ def get_dummy_config(args):
     config['activation_fn'] = args.activation_fn
 
     model_cls = models.DummyModel
+
+    # Create an experiment name that summarizes the configuration.
+    # It will be used as part of the experiment folder name.
+    experiment_name_format = "{}-{}{}-b{}-{}@{}-in{}_out{}"
+    experiment_name = experiment_name_format.format(EXPERIMENT_TIMESTAMP,
+                                                    args.model_type,
+                                                    "-"+args.experiment_name if args.experiment_name is not None else "",
+                                                    config['batch_size'],
+                                                    config['cell_size'],
+                                                    config['cell_type'],
+                                                    args.seq_length_in,
+                                                    args.seq_length_out)
+    return model_cls, config, experiment_name
+
+
+def get_rnn_spl_config(args):
+    """
+    Create a config from the parsed commandline arguments that is more readable. You can use this to define more
+    parameters and their default values.
+    Args:
+        args: The parsed commandline arguments.
+
+    Returns:
+        The model class, the config, and the experiment name.
+    """
+    assert args.model_type == "dummy"
+
+    config = dict()
+    config['model_type'] = args.model_type
+    config['seed'] = C.SEED
+    config['learning_rate'] = args.learning_rate
+    config['cell_type'] = args.cell_type
+    config['cell_size'] = args.cell_size
+    config['input_hidden_size'] = args.input_hidden_size
+    config['input_hidden_layers'] = args.input_hidden_layers
+    config['input_dropout_rate'] = args.input_dropout_rate
+    config['source_seq_len'] = args.seq_length_in
+    config['target_seq_len'] = args.seq_length_out
+    config['batch_size'] = args.batch_size
+    config['activation_fn'] = args.activation_fn
+
+    model_cls = models.RNNSPLModel
 
     # Create an experiment name that summarizes the configuration.
     # It will be used as part of the experiment folder name.
