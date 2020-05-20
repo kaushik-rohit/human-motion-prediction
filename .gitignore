@@ -1,6 +1,8 @@
 #custom 
 build/*
 dist/*
+data/*
+experiments/*
 mp20_project4_skeleton.egg-info/*
 
 # Created by https://www.gitignore.io/api/python,jupyternotebooks
