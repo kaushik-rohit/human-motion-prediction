@@ -37,10 +37,14 @@ parser.add_argument("--batch_size", type=int, default=16, help="Batch size to us
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
 parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
 parser.add_argument("--cell_size", type=int, default=256, help="RNN cell size.")
-parser.add_argument("--input_hidden_size", type=int, default=None, help="Input dense layer before the recurrent cell.")
-parser.add_argument("--input_hidden_layers", type=int, default=None, help="Number of dense layers before rnn cell.")
-parser.add_argument("--input_dropout_rate", type=float, default=None, help="Dropout rate for input layer.")
+parser.add_argument("--cell_layers", type=int, default=1, help="number of RNN cell layers")
+parser.add_argument("--input_hidden_size", type=int, default=256, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--input_hidden_layers", type=int, default=1, help="Number of dense layers before rnn cell.")
+parser.add_argument("--output_hidden_layers", type=int, default=1, help="Number of dense layers before output")
+parser.add_argument("--output_hidden_size", type=int, default=64, help="size of output dense layers")
+parser.add_argument("--input_dropout_rate", type=float, default=0.1, help="Dropout rate for input layer.")
 parser.add_argument("--activation_fn", type=str, default=None, help="Activation Function on the output.")
+parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
 
 # Training
 parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
@@ -214,7 +218,7 @@ def get_rnn_spl_config(args):
     Returns:
         The model class, the config, and the experiment name.
     """
-    assert args.model_type == "dummy"
+    assert args.model_type == "rnn_spl"
 
     config = dict()
     config['model_type'] = args.model_type
@@ -222,9 +226,13 @@ def get_rnn_spl_config(args):
     config['learning_rate'] = args.learning_rate
     config['cell_type'] = args.cell_type
     config['cell_size'] = args.cell_size
+    config['cell_layers'] = args.cell_layers
     config['input_hidden_size'] = args.input_hidden_size
     config['input_hidden_layers'] = args.input_hidden_layers
+    config['output_hidden_size'] = args.output_hidden_size
+    config['output_hidden_layers'] = args.output_hidden_layers
     config['input_dropout_rate'] = args.input_dropout_rate
+    config['joint_prediction_layer'] = args.joint_prediction_layer
     config['source_seq_len'] = args.seq_length_in
     config['target_seq_len'] = args.seq_length_out
     config['batch_size'] = args.batch_size
