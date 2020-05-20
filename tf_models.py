@@ -14,7 +14,7 @@ import tensorflow as tf
 from spl import SPL
 
 from constants import Constants as C
-from utils import get_activation_fn
+from utils import get_activation_fn, get_rnn_cell
 
 
 class BaseModel(object):
@@ -308,12 +308,13 @@ class DummyModel(BaseModel):
 class RNNSPLModel(BaseModel):
 
     def __init__(self, config, data_pl, mode, reuse, **kwargs):
-        super(DummyModel, self).__init__(config, data_pl, mode, reuse, **kwargs)
+        super(RNNSPLModel, self).__init__(config, data_pl, mode, reuse, **kwargs)
 
         # Extract some config parameters specific to this model
         self.cell_type = self.config["cell_type"]
         self.cell_size = self.config["cell_size"]
         self.input_hidden_size = self.config.get("input_hidden_size")
+        self.joint_prediction_layer = self.config["joint_prediction_layer"]
 
         # Prepare some members that need to be set when creating the graph.
         self.cell = None  # The recurrent cell.
@@ -367,7 +368,7 @@ class RNNSPLModel(BaseModel):
                                hidden_units=self.config["output_hidden_size"],
                                joint_size=self.JOINT_SIZE,
                                sparse=spl_sparse,
-                               use_h36m=self.use_h36m,
+                               use_h36m=False,
                                reuse=self.reuse)
                 pose_prediction = sp_layer.build(inputs)
 
@@ -383,10 +384,10 @@ class RNNSPLModel(BaseModel):
 
         if drop_rate > 0:
             with tf.variable_scope('input_dropout', reuse=self.reuse):
-                current_layer = tf.layers.dropout(current_layer,
-                                                  rate=drop_rate,
-                                                  seed=self.config["seed"],
-                                                  training=self.is_training)
+                self.inputs_hidden = tf.layers.dropout(self.inputs_hidden,
+                                                       rate=drop_rate,
+                                                       seed=self.config["seed"],
+                                                       training=self.is_training)
 
         hidden_layers = self.config.get("input_hidden_layers", 0)
         hidden_size = self.config.get("input_hidden_size", 0)
@@ -401,14 +402,14 @@ class RNNSPLModel(BaseModel):
     def build_cell(self):
         """Create recurrent cell."""
         with tf.variable_scope("rnn_cell", reuse=self.reuse):
-            if self.cell_type == C.LSTM:
-                cell = tf.nn.rnn_cell.LSTMCell(self.cell_size, reuse=self.reuse)
-            elif self.cell_type == C.GRU:
-                cell = tf.nn.rnn_cell.GRUCell(self.cell_size, reuse=self.reuse)
-            else:
-                raise ValueError("Cell type '{}' unknown".format(self.cell_type))
+            self.cell = get_rnn_cell(cell_type=self.config["cell_type"],
+                                     size=self.config["cell_size"],
+                                     num_layers=self.config["cell_layers"],
+                                     mode=self.mode,
+                                     reuse=self.reuse)
 
-            self.cell = cell
+    def build_loss(self):
+        super(RNNSPLModel, self).build_loss()
 
     def build_network(self):
         """Build the core part of the model."""
@@ -422,12 +423,9 @@ class RNNSPLModel(BaseModel):
                                                                  sequence_length=self.prediction_seq_len,
                                                                  initial_state=self.initial_states,
                                                                  dtype=tf.float32)
-            self.prediction_representation = self.rnn_outputs
-        self.build_output_layer()
+            context = self.rnn_outputs
+        self.prediction_representation = self.build_output_layer(context)
         self.build_loss()
-
-    def build_loss(self):
-        super(DummyModel, self).build_loss()
 
     def step(self, session):
         """
