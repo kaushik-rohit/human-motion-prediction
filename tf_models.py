@@ -424,7 +424,7 @@ class RNNSPLModel(BaseModel):
                                                                  initial_state=self.initial_states,
                                                                  dtype=tf.float32)
             context = self.rnn_outputs
-        self.prediction_representation = self.build_output_layer(context)
+        self.outputs = self.build_output_layer(context)
         self.build_loss()
 
     def step(self, session):
