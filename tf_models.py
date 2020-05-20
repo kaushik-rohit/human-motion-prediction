@@ -83,7 +83,12 @@ class BaseModel(object):
     def optimization_routines(self):
         """Add an optimizer."""
         # Use a simple SGD optimizer.
-        optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        if self.config["optimizer"] == C.OPTIMIZER_ADAM:
+            optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        elif self.config["optimizer"] == C.OPTIMIZER_SGD:
+            optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        else:
+            raise Exception("Optimization {} not found.".format(self.config["optimizer"]))
 
         # Gradients and update operation for training the model.
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)

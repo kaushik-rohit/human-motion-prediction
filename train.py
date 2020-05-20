@@ -32,6 +32,7 @@ parser.add_argument("--seq_length_out", type=int, default=24, help="Number of ou
 # Learning
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate.')
 parser.add_argument("--batch_size", type=int, default=16, help="Batch size to use during training.")
+parser.add_argument("--optimizer", type=str, default="adam", help="use sgd or adam optimizer")
 
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
@@ -47,7 +48,7 @@ parser.add_argument("--activation_fn", type=str, default=None, help="Activation 
 parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
 
 # Training
-parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
+parser.add_argument("--num_epochs", type=int, default=20, help="Number of training epochs.")
 parser.add_argument("--print_every", type=int, default=100, help="How often to log training error.")
 parser.add_argument("--test_every", type=int, default=200, help="How often to compute the error on the validation set.")
 parser.add_argument("--use_cpu", action="store_true", help="Use CPU instead of GPU.")
@@ -191,6 +192,7 @@ def get_dummy_config(args):
     config['target_seq_len'] = args.seq_length_out
     config['batch_size'] = args.batch_size
     config['activation_fn'] = args.activation_fn
+    config['optimizer'] = args.optimizer
 
     model_cls = models.DummyModel
 
@@ -237,6 +239,7 @@ def get_rnn_spl_config(args):
     config['target_seq_len'] = args.seq_length_out
     config['batch_size'] = args.batch_size
     config['activation_fn'] = args.activation_fn
+    config['optimizer'] = args.optimizer
 
     model_cls = models.RNNSPLModel
 
