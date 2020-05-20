@@ -17,6 +17,7 @@ import numpy as np
 import tensorflow as tf
 
 import tf_models as models
+from seq2seq import seq2seq
 from tf_data import TFRecordMotionDataset
 from constants import Constants as C
 from utils import export_results
@@ -62,7 +63,8 @@ def create_and_restore_test_model(session, experiment_dir, args):
 
     # Select the type of model we want to use.
     if config['model_type'] == "dummy":
-        model_cls = models.DummyModel
+        #model_cls = models.DummyModel
+        model_cls = seq2seq
     else:
         raise Exception("Unknown model type.")
 

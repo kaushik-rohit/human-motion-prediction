@@ -16,6 +16,7 @@ from constants import Constants as C
 from utils import get_activation_fn
 
 
+
 class BaseModel(object):
     """
     Base class that defines some functions and variables commonly used by all models. Subclass `BaseModel` to
@@ -106,6 +107,35 @@ class BaseModel(object):
         with tf.variable_scope("output_layer", reuse=self.reuse):
             self.outputs = tf.layers.dense(self.prediction_representation, self.input_size,
                                            self.activation_fn_out, reuse=self.reuse)
+
+    def build_prediction_layer(self, inputs):
+        """Given a context representation (i.e., rnn outputs), makes pose prediction by either using structured
+        prediction layer (SPL) or standard dense layer.
+
+        Args:
+            inputs: A tensor or (batch_size, seq_len, representation_size)
+        Returns:
+            predicted pose sequence: A tensor or (batch_size, seq_len, pose_size)
+        """
+        if self.joint_prediction_layer == "plain":
+            # Create a number of hidden layers and predict the full pose vector.
+            with tf.variable_scope('output_layer', reuse=self.reuse):
+                hidden_layers = self.config.get("output_hidden_layers", 0)
+                current_layer = inputs
+                for layer_idx in range(hidden_layers):
+                    with tf.variable_scope('out_dense_all_' + str(layer_idx), reuse=self.reuse):
+                        current_layer = tf.layers.dense(inputs=current_layer, units=self.config["output_hidden_size"],
+                                                        activation=tf.nn.relu)
+                with tf.variable_scope('out_dense_all_' + str(hidden_layers), reuse=self.reuse):
+                    pose_prediction = tf.layers.dense(inputs=current_layer, units=self.HUMAN_SIZE, activation=None)
+
+        else:
+            pass
+            #spl here
+
+        if self.residual_velocity:
+            pose_prediction += self.prediction_inputs[:, 0:tf.shape(pose_prediction)[1], :self.HUMAN_SIZE]
+        return pose_prediction
 
     def summary_routines(self):
         """Create the summary operations necessary to write logs into tensorboard."""

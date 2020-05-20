@@ -86,6 +86,7 @@ class seq2seq(BaseModel):
         with tf.variable_scope("seq2seq", reuse=self.reuse):
             # === Add space decoder ===
             if self.joint_prediction_layer == "plain":
+                print("here 2")
                 cell = rnn_cell_extensions.LinearSpaceDecoderWrapper(cell, self.input_size)
             else:
                 pass

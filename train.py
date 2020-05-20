@@ -25,6 +25,7 @@ from motion_metrics import MetricsEngine
 parser = argparse.ArgumentParser()
 
 #python train.py --data_dir data/ --save_dir ./experiments --experiment_name seq2seq
+#python evaluate_test.py --data_dir --save_dir ./experiments --export --model_id 1589985718
 
 # Data
 parser.add_argument('--data_dir', required=True, default='./data', help='Where the data (tfrecords) is stored.')
@@ -188,9 +189,9 @@ def get_dummy_config(args):
     config['activation_fn'] = args.activation_fn
 
     #overwriting some here
-    config['"joint_prediction_layer'] = "plain"
+    config['joint_prediction_layer'] = "plain"
     config['cell_layers'] = 1
-    config['cell_size'] = 135 #changed this from 1024?! to make it work
+    config['cell_size'] = 1024 #changed this from 1024?! to make it work
     config['input_hidden_layers'] = 0
     config["architecture"] = "tied"
     config["autoregressive_input"] = "supervised"
@@ -201,6 +202,7 @@ def get_dummy_config(args):
     config["output_hidden_size"]= 960
     config["data_type"]= "aa"
     config["residual_velocity"] = True
+    
 
 
     model_cls = models.DummyModel
