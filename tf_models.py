@@ -38,6 +38,12 @@ class BaseModel(object):
         self.is_training = self.mode == C.TRAIN  # If we are in training mode.
         self.global_step = tf.train.get_global_step(graph=None)  # Stores the number of training iterations.
 
+
+        #added by us
+        self.joint_prediction_layer = config.get("joint_prediction_layer", None)
+        self.residual_velocity = config.get("residual_velocity", None)  # True or False
+        self.activation_fn = tf.nn.relu
+
         # The following members should be set by the child class.
         self.outputs = None  # The final predictions.
         self.prediction_targets = None  # The targets.
@@ -94,6 +100,9 @@ class BaseModel(object):
 
     def build_output_layer(self):
         """Build the final dense output layer without any activation."""
+
+
+
         with tf.variable_scope("output_layer", reuse=self.reuse):
             self.outputs = tf.layers.dense(self.prediction_representation, self.input_size,
                                            self.activation_fn_out, reuse=self.reuse)
@@ -128,6 +137,66 @@ class BaseModel(object):
         Compute the predictions given the seed sequence without having access to the ground-truth values.
         """
         raise NotImplementedError()
+
+    @classmethod
+    def get_model_config(cls, args, from_config=None):
+        """Given command-line arguments, creates the configuration dictionary.
+
+        It is later passed to the models and stored in the disk.
+        Args:
+            args: command-line argument object.
+            from_config: use an already existing config dictionary.
+        Returns:
+            experiment configuration (dict), experiment name (str)
+        """
+        if from_config is None:
+            config = dict()
+            config['seed'] = args.seed
+            config['model_type'] = args.model_type
+            config['data_type'] = args.data_type
+            config['use_h36m'] = args.use_h36m
+
+            config['no_normalization'] = args.no_normalization
+            config['batch_size'] = args.batch_size
+            config['source_seq_len'] = args.source_seq_len
+            config['target_seq_len'] = args.target_seq_len
+
+            config['early_stopping_tolerance'] = args.early_stopping_tolerance
+            config['num_epochs'] = args.num_epochs
+
+            config['learning_rate'] = args.learning_rate
+            config['learning_rate_decay_steps'] = args.learning_rate_decay_steps
+            config['learning_rate_decay_rate'] = args.learning_rate_decay_rate
+            config['grad_clip_norm'] = args.grad_clip_norm
+            config['optimizer'] = args.optimizer
+
+            config['input_hidden_layers'] = args.input_hidden_layers
+            config['input_hidden_size'] = args.input_hidden_size
+            config['input_dropout_rate'] = args.input_dropout_rate
+
+            config["cell_type"] = args.cell_type
+            config["cell_size"] = args.cell_size
+            config["cell_layers"] = args.cell_layers
+
+            config['output_hidden_layers'] = args.output_hidden_layers
+            config['output_hidden_size'] = args.output_hidden_size
+
+            config['residual_velocity'] = args.residual_velocity
+            config['loss_type'] = args.loss_type
+            config['joint_prediction_layer'] = args.joint_prediction_layer
+        else:
+            config = from_config
+
+        config["experiment_id"] = str(int(time.time()))
+        experiment_name_format = "{}-{}-{}_{}-b{}-in{}_out{}"
+        experiment_name = experiment_name_format.format(config["experiment_id"],
+                                                        args.model_type,
+                                                        "h36m" if args.use_h36m else "amass",
+                                                        args.data_type,
+                                                        args.batch_size,
+                                                        args.source_seq_len,
+                                                        args.target_seq_len)
+        return config, experiment_name
 
 
 class DummyModel(BaseModel):

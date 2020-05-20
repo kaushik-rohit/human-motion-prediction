@@ -17,11 +17,14 @@ import numpy as np
 import tensorflow as tf
 
 import tf_models as models
+from seq2seq import seq2seq
 from tf_data import TFRecordMotionDataset
 from constants import Constants as C
 from motion_metrics import MetricsEngine
 
 parser = argparse.ArgumentParser()
+
+#python train.py --data_dir data/ --save_dir ./experiments --experiment_name seq2seq
 
 # Data
 parser.add_argument('--data_dir', required=True, default='./data', help='Where the data (tfrecords) is stored.')
@@ -184,7 +187,24 @@ def get_dummy_config(args):
     config['batch_size'] = args.batch_size
     config['activation_fn'] = args.activation_fn
 
+    #overwriting some here
+    config['"joint_prediction_layer'] = "plain"
+    config['cell_layers'] = 1
+    config['cell_size'] = 135 #changed this from 1024?! to make it work
+    config['input_hidden_layers'] = 0
+    config["architecture"] = "tied"
+    config["autoregressive_input"] = "supervised"
+    config['cell_type'] = "lstm"
+    config["optimizer"]="adam"
+    config["no_normalization"]= False
+    config["output_hidden_layers"]= 1
+    config["output_hidden_size"]= 960
+    config["data_type"]= "aa"
+    config["residual_velocity"] = True
+
+
     model_cls = models.DummyModel
+    model_cls = seq2seq
 
     # Create an experiment name that summarizes the configuration.
     # It will be used as part of the experiment folder name.
