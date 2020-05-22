@@ -47,6 +47,8 @@ class BaseModel(object):
         self.prediction_representation = None  # Intermediate representations.
         self.loss = None  # Loss op to be used during training.
         self.learning_rate = config["learning_rate"]  # Learning rate.
+        self.decay_rate = self.config.get('learning_rate_decay_rate')
+        self.decay_steps = self.config.get('learning_rate_decay_steps')
         self.parameter_update = None  # The training op.
         self.summary_update = None  # Summary op.
 
@@ -82,11 +84,17 @@ class BaseModel(object):
 
     def optimization_routines(self):
         """Add an optimizer."""
-        # Use a simple SGD optimizer.
+        global_step = tf.train.get_global_step(graph=None)
+        learning_rate = tf.train.exponential_decay(self.learning_rate,
+                                                   global_step=global_step,
+                                                   decay_steps=self.decay_steps,
+                                                   decay_rate=self.decay_rate,
+                                                   staircase=True)
+        # select optimizer based on user input
         if self.config["optimizer"] == C.OPTIMIZER_ADAM:
-            optimizer = tf.train.AdamOptimizer(self.learning_rate)
+            optimizer = tf.train.AdamOptimizer(learning_rate)
         elif self.config["optimizer"] == C.OPTIMIZER_SGD:
-            optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+            optimizer = tf.train.GradientDescentOptimizer(learning_rate)
         else:
             raise Exception("Optimization {} not found.".format(self.config["optimizer"]))
 

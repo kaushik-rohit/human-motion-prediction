@@ -33,6 +33,8 @@ parser.add_argument("--seq_length_out", type=int, default=24, help="Number of ou
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate.')
 parser.add_argument("--batch_size", type=int, default=16, help="Batch size to use during training.")
 parser.add_argument("--optimizer", type=str, default="adam", help="use sgd or adam optimizer")
+parser.add_argument("--learning_rate_decay_rate", type=float, default="0.98", help="learning decay rate")
+parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help="steps in which learning rate decay")
 
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
@@ -48,7 +50,7 @@ parser.add_argument("--activation_fn", type=str, default=None, help="Activation 
 parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
 
 # Training
-parser.add_argument("--num_epochs", type=int, default=20, help="Number of training epochs.")
+parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
 parser.add_argument("--print_every", type=int, default=100, help="How often to log training error.")
 parser.add_argument("--test_every", type=int, default=200, help="How often to compute the error on the validation set.")
 parser.add_argument("--use_cpu", action="store_true", help="Use CPU instead of GPU.")
@@ -185,6 +187,8 @@ def get_dummy_config(args):
     config['model_type'] = args.model_type
     config['seed'] = C.SEED
     config['learning_rate'] = args.learning_rate
+    config['learning_rate_decay_rate'] = args.learning_rate_decay_rate
+    config['learning_rate_decay_steps'] = args.learning_rate_decay_steps
     config['cell_type'] = args.cell_type
     config['cell_size'] = args.cell_size
     config['input_hidden_size'] = args.input_hidden_size
@@ -226,6 +230,8 @@ def get_rnn_spl_config(args):
     config['model_type'] = args.model_type
     config['seed'] = C.SEED
     config['learning_rate'] = args.learning_rate
+    config['learning_rate_decay_rate'] = args.learning_rate_decay_rate
+    config['learning_rate_decay_steps'] = args.learning_rate_decay_steps
     config['cell_type'] = args.cell_type
     config['cell_size'] = args.cell_size
     config['cell_layers'] = args.cell_layers
