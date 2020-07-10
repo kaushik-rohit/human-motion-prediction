@@ -63,6 +63,8 @@ def create_and_restore_test_model(session, experiment_dir, args):
     # Select the type of model we want to use.
     if config['model_type'] == "dummy":
         model_cls = models.DummyModel
+    elif config['model_type'] == "rnn_spl":
+        model_cls = models.RNNSPLModel
     else:
         raise Exception("Unknown model type.")
 
