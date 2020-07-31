@@ -80,6 +80,7 @@ class TFRecordMotionDataset(Dataset):
     """
     Dataset class for motion samples stored as TFRecord files.
     """
+
     def __init__(self, data_path, meta_data_path, batch_size, shuffle, **kwargs):
         # Size of windows to be extracted.
         self.extract_windows_of = kwargs.get("extract_windows_of", 0)
@@ -115,15 +116,16 @@ class TFRecordMotionDataset(Dataset):
             functools.partial(self._parse_single_tfexample_fn), num_parallel_calls=self.num_parallel_calls)
 
         # Makes everything faster.
-        self.tf_data = self.tf_data.prefetch(self.batch_size*10)
+        self.tf_data = self.tf_data.prefetch(self.batch_size * 10)
 
         # Maybe shuffle.
         if self.shuffle:
-            self.tf_data = self.tf_data.shuffle(self.batch_size*10)
+            self.tf_data = self.tf_data.shuffle(self.batch_size * 10)
 
         # If you want to do some pre-processing on the entire input sequence (i.e. before we extract windows),
         # here would be a good idea (disabled for now)
-        # self.tf_data = self.tf_data.map(functools.partial(self._my_own_preprocessing),
+        # self.tf_data = self.tf_data.map(functools.partial(self._my_own_preprocessing, self.meta_data['mean_all'],
+        #                                 self.meta_data['var_all']),
         #                                 num_parallel_calls=self.num_parallel_calls)
 
         # Maybe extract windows
@@ -144,6 +146,9 @@ class TFRecordMotionDataset(Dataset):
                                         num_parallel_calls=self.num_parallel_calls)
 
         # If you want to do some pre-processing on the extracted windows, here is the place to do it.
+        self.tf_data = self.tf_data.map(functools.partial(self._my_own_preprocessing, self.meta_data['mean_all'],
+                                                          self.meta_data['var_all']),
+                                        num_parallel_calls=self.num_parallel_calls)
 
     def tf_data_to_model(self):
         """Converts the data into the format that a model expects. Creates input, target, sequence_length, etc."""
@@ -164,9 +169,9 @@ class TFRecordMotionDataset(Dataset):
 
     def _pp_get_windows_randomly(self, sample):
         """Extract a random window from somewhere in the sequence."""
-        start = tf.random_uniform((1, 1), minval=0, maxval=tf.shape(sample["poses"])[0]-self.extract_windows_of+1,
+        start = tf.random_uniform((1, 1), minval=0, maxval=tf.shape(sample["poses"])[0] - self.extract_windows_of + 1,
                                   dtype=tf.int32)[0][0]
-        end = tf.minimum(start+self.extract_windows_of, tf.shape(sample["poses"])[0])
+        end = tf.minimum(start + self.extract_windows_of, tf.shape(sample["poses"])[0])
         sample["poses"] = sample["poses"][start:end, :]
         sample["shape"] = tf.shape(sample["poses"])
         return sample
@@ -223,7 +228,7 @@ class TFRecordMotionDataset(Dataset):
         return model_sample
 
     @staticmethod
-    def _my_own_preprocessing(tf_sample_dict):
+    def _my_own_preprocessing(mean, var, tf_sample_dict):
         """
         Placeholder for custom pre-processing.
         Args:
@@ -232,9 +237,14 @@ class TFRecordMotionDataset(Dataset):
         Returns:
             The same dictionary, but pre-processed.
         """
+
         def _my_np_func(p):
+            # print(p.shape)
+            great = np.copy(p)
             # do something great in numpy
-            great = p - 0.0
+            # only apply normalization to the input sequence
+            # i.e first 120 frames of the 144*135 input
+            great[0:120, :] = (great[0:120, :] - mean) / var
             return great
 
         # A useful function provided by TensorFlow is `tf.py_func`. It wraps python functions so that they can
