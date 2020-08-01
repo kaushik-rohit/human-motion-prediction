@@ -39,12 +39,12 @@ parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help=
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
 parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
-parser.add_argument("--cell_size", type=int, default=256, help="RNN cell size.")
+parser.add_argument("--cell_size", type=int, default=1024, help="RNN cell size.")
 parser.add_argument("--cell_layers", type=int, default=1, help="number of RNN cell layers")
 parser.add_argument("--input_hidden_size", type=int, default=256, help="Input dense layer before the recurrent cell.")
 parser.add_argument("--input_hidden_layers", type=int, default=1, help="Number of dense layers before rnn cell.")
 parser.add_argument("--output_hidden_layers", type=int, default=1, help="Number of dense layers before output")
-parser.add_argument("--output_hidden_size", type=int, default=64, help="size of output dense layers")
+parser.add_argument("--output_hidden_size", type=int, default=128, help="size of output dense layers")
 parser.add_argument("--input_dropout_rate", type=float, default=0.1, help="Dropout rate for input layer.")
 parser.add_argument("--activation_fn", type=str, default=None, help="Activation Function on the output.")
 parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
@@ -329,6 +329,9 @@ def train():
                 final_metrics = _metrics_engine.get_final_metrics()
             return final_metrics, time.perf_counter() - _start_time, _eval_result
 
+        stopping_step = 0
+        best_loss = 99999
+
         while not stop_signal:
             # Training.
             for i in range(ARGS.test_every):
@@ -348,12 +351,21 @@ def train():
                         print("Train [{:04d}] \t Loss: {:.3f} \t time/batch: {:.3f}".format(step,
                                                                                             train_loss_avg,
                                                                                             time_elapsed))
-
                 except tf.errors.OutOfRangeError:
                     sess.run(train_iter.initializer)
                     epoch += 1
                     if epoch >= ARGS.num_epochs:
                         stop_signal = True
+                        break
+
+                    if train_loss < best_loss:
+                        stopping_step = 0
+                        best_loss = train_loss
+                    else:
+                        stopping_step += 1
+                    if stopping_step >= 3:
+                        stop_signal = True
+                        print("Early stopping is triggered")
                         break
 
             # Evaluation: make a full pass on the validation split.
