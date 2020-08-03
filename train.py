@@ -300,6 +300,10 @@ def train():
         train_iter = train_data.get_iterator()
         valid_iter = valid_data.get_iterator()
 
+        # Early Stopping
+        stopping_step = 0
+        best_loss = np.inf
+
         print("Running Training Loop.")
         # Initialize the data iterators.
         sess.run(train_iter.initializer)
@@ -329,9 +333,6 @@ def train():
                 final_metrics = _metrics_engine.get_final_metrics()
             return final_metrics, time.perf_counter() - _start_time, _eval_result
 
-        stopping_step = 0
-        best_loss = 99999
-
         while not stop_signal:
             # Training.
             for i in range(ARGS.test_every):
@@ -358,16 +359,6 @@ def train():
                         stop_signal = True
                         break
 
-                    if train_loss < best_loss:
-                        stopping_step = 0
-                        best_loss = train_loss
-                    else:
-                        stopping_step += 1
-                    if stopping_step >= 3:
-                        stop_signal = True
-                        print("Early stopping is triggered")
-                        break
-
             # Evaluation: make a full pass on the validation split.
             valid_metrics, valid_time, _ = evaluate_model(valid_model, valid_iter, metrics_engine)
             # print an informative string to the console
@@ -384,9 +375,22 @@ def train():
             metrics_engine.reset()
             sess.run(valid_iter.initializer)
 
+            valid_loss = valid_metrics["joint_angle"].sum()
+
+            if valid_loss < best_loss:
+                stopping_step = 0
+            else:
+                stopping_step += 1
+
+            if stopping_step == 20:
+                stop_signal = True
+
             # Save the model. You might want to think about if it's always a good idea to do that.
-            print("Saving the model to {}".format(experiment_dir))
-            saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')), global_step=step-1)
+            # yes not the best idea to save model everytime, instead we save it only if validation loss improves
+            if valid_loss <= best_loss:
+                best_loss = valid_loss
+                print("Saving the model to {}".format(experiment_dir))
+                saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')), global_step=step-1)
 
         print("End of Training.")
 
