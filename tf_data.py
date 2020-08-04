@@ -146,8 +146,7 @@ class TFRecordMotionDataset(Dataset):
                                         num_parallel_calls=self.num_parallel_calls)
 
         # If you want to do some pre-processing on the extracted windows, here is the place to do it.
-        self.tf_data = self.tf_data.map(functools.partial(self._my_own_preprocessing, self.meta_data['mean_all'],
-                                                          self.meta_data['var_all']),
+        self.tf_data = self.tf_data.map(functools.partial(self._my_own_preprocessing),
                                         num_parallel_calls=self.num_parallel_calls)
 
     def tf_data_to_model(self):
@@ -227,8 +226,7 @@ class TFRecordMotionDataset(Dataset):
         model_sample[C.BATCH_ID] = tf_sample_dict["file_id"]
         return model_sample
 
-    @staticmethod
-    def _my_own_preprocessing(mean, var, tf_sample_dict):
+    def _my_own_preprocessing(self, tf_sample_dict):
         """
         Placeholder for custom pre-processing.
         Args:
@@ -240,11 +238,12 @@ class TFRecordMotionDataset(Dataset):
 
         def _my_np_func(p):
             # print(p.shape)
-            great = np.copy(p)
             # do something great in numpy
-            # only apply normalization to the input sequence
-            # i.e first 120 frames of the 144*135 input
-            great[0:120, :] = (great[0:120, :] - mean) / var
+            # print('mean channel: ', self.mean_all.shape)
+            # print('var channel: ', self.var_all.shape)
+            # print('input ', p.shape)
+            great = (p - self.mean_all) / self.var_all
+            # print('great ', great.shape)
             return great
 
         # A useful function provided by TensorFlow is `tf.py_func`. It wraps python functions so that they can
@@ -255,6 +254,37 @@ class TFRecordMotionDataset(Dataset):
         # Set the shape on the output of `py_func` again explicitly, otherwise some functions might complain later on.
         processed.set_shape([None, 135])
 
+        # Update the sample dict and return it.
+        model_sample = tf_sample_dict
+        model_sample["poses"] = processed
+        model_sample["shape"] = tf.shape(processed)
+        return model_sample
+
+    def undo_preprocessing(self, tf_sample_dict):
+        """
+        Placeholder for custom pre-processing.
+        Args:
+            tf_sample_dict: The dictionary returned by `_parse_single_tfexample_fn`.
+
+        Returns:
+            The same dictionary, but pre-processed.
+        """
+        print('undo preprocessing')
+
+        def _my_func(p):
+            # print(p.shape)
+            # do something great in numpy
+            # print('mean channel: ', self.mean_all.shape)
+            # print('var channel: ', self.var_all.shape)
+            # print('input ', p.shape)
+            great = (p * self.var_all) + self.mean_all
+            return great
+
+        # A useful function provided by TensorFlow is `tf.py_func`. It wraps python functions so that they can
+        # be used inside TensorFlow. This means, you can program something in numpy and then use it as a node
+        # in the computational graph.
+        # processed = tf.py_func(_my_func, [tf_sample_dict["poses"]], tf.float32)
+        processed = _my_func(tf_sample_dict["poses"])
         # Update the sample dict and return it.
         model_sample = tf_sample_dict
         model_sample["poses"] = processed

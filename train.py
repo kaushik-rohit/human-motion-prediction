@@ -319,14 +319,24 @@ def train():
                 while True:
                     # get the predictions and ground truth values
                     predictions, targets, seed_sequence, data_id = _eval_model.sampled_step(sess)
-                    _metrics_engine.compute_and_aggregate(predictions, targets)
+
+                    # unnormalize to get back to rotation matrices
+                    p = train_data.undo_preprocessing({"poses": predictions})['poses']
+                    t = train_data.undo_preprocessing({"poses": targets})['poses']
+
+                    # _metrics_engine.compute_and_aggregate(predictions, targets)
+                    _metrics_engine.compute_and_aggregate(p, t)
 
                     if _return_results:
                         # Store each test sample and corresponding predictions with the unique sample IDs.
                         for k in range(predictions.shape[0]):
-                            _eval_result[data_id[k].decode("utf-8")] = (predictions[k],
-                                                                        targets[k],
-                                                                        seed_sequence["poses"][k])
+                            s = train_data.undo_preprocessing({"poses": seed_sequence})['poses']
+                            _eval_result[data_id[k].decode("utf-8")] = (p[k],
+                                                                        t['poses'][k],
+                                                                        s["poses"][k])
+                            # _eval_result[data_id[k].decode("utf-8")] = (predictions[k],
+                            #                                             targets[k],
+                            #                                             seed_sequence[k])
 
             except tf.errors.OutOfRangeError:
                 # finalize the computation of the metrics
