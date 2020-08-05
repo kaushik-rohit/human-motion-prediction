@@ -237,19 +237,18 @@ class TFRecordMotionDataset(Dataset):
         """
 
         def _my_np_func(p):
-            # print(p.shape)
             # do something great in numpy
             # print('mean channel: ', self.mean_all.shape)
             # print('var channel: ', self.var_all.shape)
             # print('input ', p.shape)
-            great = (p - self.mean_all) / self.var_all
-            # print('great ', great.shape)
-            return great
+            great = (p - self.mean_channel) / self.var_channel
+            return np.ndarray.astype(great, np.float32)
 
         # A useful function provided by TensorFlow is `tf.py_func`. It wraps python functions so that they can
         # be used inside TensorFlow. This means, you can program something in numpy and then use it as a node
         # in the computational graph.
         processed = tf.py_func(_my_np_func, [tf_sample_dict["poses"]], tf.float32)
+        # processed = _my_np_func(tf_sample_dict["poses"])
 
         # Set the shape on the output of `py_func` again explicitly, otherwise some functions might complain later on.
         processed.set_shape([None, 135])
@@ -269,16 +268,14 @@ class TFRecordMotionDataset(Dataset):
         Returns:
             The same dictionary, but pre-processed.
         """
-        print('undo preprocessing')
 
         def _my_func(p):
-            # print(p.shape)
             # do something great in numpy
             # print('mean channel: ', self.mean_all.shape)
             # print('var channel: ', self.var_all.shape)
             # print('input ', p.shape)
-            great = (p * self.var_all) + self.mean_all
-            return great
+            great = (p * self.var_channel) + self.mean_channel
+            return np.ndarray.astype(great, np.float32)
 
         # A useful function provided by TensorFlow is `tf.py_func`. It wraps python functions so that they can
         # be used inside TensorFlow. This means, you can program something in numpy and then use it as a node
