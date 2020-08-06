@@ -25,6 +25,7 @@ Skeletal structure for full-body human pose is defined below. Similarly, you can
 """
 
 import tensorflow as tf
+import constants as C
 
 # TODO (emre) this skeleton representation is a uncommon and tedious as well. Something more straightforward?
 # [(Parent ID, Joint ID, Joint Name), (...)] where each entry in a list corresponds to the joints at the same
@@ -40,13 +41,13 @@ SMPL_SKELETON = [
 
 
 class SPL(object):
-    def __init__(self, hidden_layers, hidden_units, joint_size, reuse, config, sparse=False):
+    def __init__(self, hidden_layers, hidden_units, joint_size, reuse, config, is_training, sparse=False):
 
         self.config = config
         self.per_joint_layers = hidden_layers
         self.per_joint_units = hidden_units
         self.reuse = reuse
-        self.is_training = config["is_training"]
+        self.is_training = is_training
         self.sparse_spl = sparse
 
         self.skeleton = SMPL_SKELETON

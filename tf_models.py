@@ -47,6 +47,7 @@ class BaseModel(object):
         self.prediction_representation = None  # Intermediate representations.
         self.loss = None  # Loss op to be used during training.
         self.learning_rate = config["learning_rate"]  # Learning rate.
+        self.gradient_norms = None
         self.decay_rate = self.config.get('learning_rate_decay_rate')
         self.decay_steps = self.config.get('learning_rate_decay_steps')
         self.parameter_update = None  # The training op.
@@ -84,9 +85,11 @@ class BaseModel(object):
 
     def optimization_routines(self):
         """Add an optimizer."""
-        global_step = tf.train.get_global_step(graph=None)
+        # global_step = tf.train.get_global_step()
+        print(self.decay_steps)
+        print(self.decay_rate)
         learning_rate = tf.train.exponential_decay(self.learning_rate,
-                                                   global_step=global_step,
+                                                   global_step=self.global_step,
                                                    decay_steps=self.decay_steps,
                                                    decay_rate=self.decay_rate,
                                                    staircase=True)
@@ -103,6 +106,7 @@ class BaseModel(object):
         with tf.control_dependencies(update_ops):
             params = tf.trainable_variables()
             gradients = tf.gradients(self.loss, params)
+            gradients, self.gradient_norms = tf.clip_by_global_norm(gradients, 1.0)
             # In case you want to do anything to the gradients, here you could do it.
             self.parameter_update = optimizer.apply_gradients(grads_and_vars=zip(gradients, params),
                                                               global_step=self.global_step)
@@ -381,7 +385,8 @@ class RNNSPLModel(BaseModel):
                                hidden_units=self.config["output_hidden_size"],
                                joint_size=self.JOINT_SIZE,
                                sparse=spl_sparse,
-                               use_h36m=False,
+                               config=self.config,
+                               is_training=self.is_training,
                                reuse=self.reuse)
                 pose_prediction = sp_layer.build(inputs)
 
