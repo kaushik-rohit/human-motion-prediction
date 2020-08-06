@@ -37,31 +37,20 @@ SMPL_SKELETON = [
     [(7, 10, "head"), (8, 11, "l_shoulder"), (9, 12, "r_shoulder")],
     [(11, 13, "l_elbow"), (12, 14, "r_elbow")]
 ]
-H36M_SKELETON = [
-    [(-1, 0, "Hips")],
-    [(0, 1, "RightUpLeg"), (0, 5, "LeftUpLeg"), (0, 9, "Spine")],
-    [(1, 2, "RightLeg"), (5, 6, "LeftLeg"), (9, 10, "Spine1")],
-    [(2, 3, "RightFoot"), (6, 7, "LeftFoot"), (10, 17, "RightShoulder"), (10, 13, "LeftShoulder"), (10, 11, "Neck")],
-    [(3, 4, "RightToeBase"), (7, 8, "LeftToeBase"), (17, 18, "RightArm"), (13, 14, "LeftArm"), (11, 12, "Head")],
-    [(18, 19, "RightForeArm"), (14, 15, "LeftForeArm")],
-    [(19, 20, "RightHand"), (15, 16, "LeftHand")]
-]
 
 
 class SPL(object):
-    def __init__(self, hidden_layers, hidden_units, joint_size, reuse, sparse=False, use_h36m=False):
+    def __init__(self, hidden_layers, hidden_units, joint_size, reuse, config, sparse=False):
 
+        self.config = config
         self.per_joint_layers = hidden_layers
         self.per_joint_units = hidden_units
         self.reuse = reuse
-        self.use_h36m = use_h36m
+        self.is_training = config["is_training"]
         self.sparse_spl = sparse
 
         self.skeleton = SMPL_SKELETON
         self.num_joints = 15
-        if self.use_h36m:
-            self.skeleton = H36M_SKELETON
-            self.num_joints = 21
 
         self.joint_size = joint_size
         self.human_size = self.num_joints * self.joint_size
@@ -130,6 +119,11 @@ class SPL(object):
         for layer_idx in range(self.per_joint_layers):
             with tf.variable_scope('out_dense_' + name + "_" + str(layer_idx), reuse=tf.AUTO_REUSE):
                 current_layer = tf.layers.dense(inputs=current_layer, units=self.per_joint_units, activation=tf.nn.relu)
+
+                # apply dropout before passing the current predictions further
+                if self.config["spl_dropout"] and self.config["spl_dropout_rate"] > 0:
+                    current_layer = tf.layers.dropout(current_layer, rate=self.config["spl_dropout_rate"],
+                                                      training=self.is_training)
 
         with tf.variable_scope('out_dense_' + name + "_" + str(self.per_joint_layers), reuse=tf.AUTO_REUSE):
             return tf.layers.dense(inputs=current_layer, units=output_size, activation=None)
