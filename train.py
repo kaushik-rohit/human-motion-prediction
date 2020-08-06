@@ -31,23 +31,26 @@ parser.add_argument("--seq_length_out", type=int, default=24, help="Number of ou
 
 # Learning
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate.')
-parser.add_argument("--batch_size", type=int, default=16, help="Batch size to use during training.")
+parser.add_argument("--batch_size", type=int, default=64, help="Batch size to use during training.")
 parser.add_argument("--optimizer", type=str, default="adam", help="use sgd or adam optimizer")
+parser.add_argument("--early_stopping_tolerance", type=int, default=20, help="tolerance")
 parser.add_argument("--learning_rate_decay_rate", type=float, default="0.98", help="learning decay rate")
 parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help="steps in which learning rate decay")
 
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
 parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
-parser.add_argument("--cell_size", type=int, default=1024, help="RNN cell size.")
-parser.add_argument("--cell_layers", type=int, default=1, help="number of RNN cell layers")
-parser.add_argument("--input_hidden_size", type=int, default=256, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--cell_size", type=int, default=512, help="RNN cell size.")
+parser.add_argument("--cell_layers", type=int, default=2, help="number of RNN cell layers")
+parser.add_argument("--input_hidden_size", type=int, default=128, help="Input dense layer before the recurrent cell.")
 parser.add_argument("--input_hidden_layers", type=int, default=1, help="Number of dense layers before rnn cell.")
 parser.add_argument("--output_hidden_layers", type=int, default=1, help="Number of dense layers before output")
-parser.add_argument("--output_hidden_size", type=int, default=128, help="size of output dense layers")
+parser.add_argument("--output_hidden_size", type=int, default=64, help="size of output dense layers")
 parser.add_argument("--input_dropout_rate", type=float, default=0.1, help="Dropout rate for input layer.")
 parser.add_argument("--activation_fn", type=str, default=None, help="Activation Function on the output.")
 parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
+parser.add_argument("--spl_dropout", action="store_true", help="use dropout between spl predictions")
+parser.add_argument("--spl_dropout_rate", type=float, default=0.1, help="Dropout rate for spl layers")
 
 # Training
 parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
@@ -246,6 +249,8 @@ def get_rnn_spl_config(args):
     config['batch_size'] = args.batch_size
     config['activation_fn'] = args.activation_fn
     config['optimizer'] = args.optimizer
+    config['spl_dropout'] = args.spl_dropout
+    config['spl_dropout_rate'] = args.spl_dropout_rate
 
     model_cls = models.RNNSPLModel
 
@@ -392,7 +397,7 @@ def train():
             else:
                 stopping_step += 1
 
-            if stopping_step == 20:
+            if stopping_step == ARGS.early_stopping_tolerance:
                 stop_signal = True
 
             # Save the model. You might want to think about if it's always a good idea to do that.
@@ -400,7 +405,9 @@ def train():
             if valid_loss <= best_loss:
                 best_loss = valid_loss
                 print("Saving the model to {}".format(experiment_dir))
-                saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')), global_step=step-1)
+                print(sess.graph_def.ByteSize())
+                saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')),
+                           write_meta_graph=False, global_step=step-1)
 
         print("End of Training.")
 
