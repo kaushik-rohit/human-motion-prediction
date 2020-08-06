@@ -23,6 +23,7 @@ class Constants(object):
     # Recurrent cells.
     LSTM = 'lstm'
     GRU = 'gru'
+    BLSTM = 'blstm'
 
     # Data Batch.
     BATCH_SEQ_LEN = "seq_len"
