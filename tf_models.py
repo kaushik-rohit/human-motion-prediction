@@ -53,12 +53,6 @@ class BaseModel(object):
         self.parameter_update = None  # The training op.
         self.summary_update = None  # Summary op.
 
-        # Hard-coded parameters that define the input size.
-        self.JOINT_SIZE = 3 * 3
-        self.NUM_JOINTS = 15
-        self.HUMAN_SIZE = self.NUM_JOINTS * self.JOINT_SIZE
-        self.input_size = self.HUMAN_SIZE
-
     def build_graph(self):
         """Build this model, i.e. its computational graph."""
         self.build_network()
@@ -340,6 +334,12 @@ class RNNSPLModel(BaseModel):
         self.rnn_state = None  # The final state of the RNN layer.
         self.inputs_hidden = None  # The inputs to the recurrent cell.
 
+        # Hard-coded parameters that define the input size.
+        self.JOINT_SIZE = 3 * 3
+        self.NUM_JOINTS = 15
+        self.HUMAN_SIZE = self.NUM_JOINTS * self.JOINT_SIZE
+        self.input_size = self.HUMAN_SIZE
+
         # How many steps we must predict.
         if self.is_training:
             self.sequence_length = self.source_seq_len + self.target_seq_len - 1
@@ -427,7 +427,31 @@ class RNNSPLModel(BaseModel):
                                      reuse=self.reuse)
 
     def build_loss(self):
-        super(RNNSPLModel, self).build_loss()
+        """Calculates the loss between the predicted and ground-truth sequences.
+
+        Some models (i.e., rnn) evaluate the prediction on the entire sequence while some (i.e., seq2seq) ignores the
+        seed pose. If not training, we evaluate all models only on the target pose.
+        Returns:
+            loss op.
+        """
+        # super(RNNSPLModel, self).build_loss()
+
+        if self.is_eval:
+            predictions_pose = self.outputs[:, -self.target_seq_len:, :]
+            targets_pose = self.prediction_targets[:, -self.target_seq_len:, :]
+            seq_len = self.target_seq_len
+        else:
+            predictions_pose = self.outputs
+            targets_pose = self.prediction_targets
+            seq_len = tf.shape(self.outputs)[1]
+
+        with tf.name_scope("loss_angles"):
+            diff = targets_pose - predictions_pose
+            per_joint_loss = tf.reshape(tf.square(diff), (-1, seq_len, self.NUM_JOINTS, self.JOINT_SIZE))
+            per_joint_loss = tf.sqrt(tf.reduce_sum(per_joint_loss, axis=-1))
+            per_joint_loss = tf.reduce_sum(per_joint_loss, axis=-1)
+            per_joint_loss = tf.reduce_mean(per_joint_loss)
+            self.loss = per_joint_loss
 
     def build_network(self):
         """Build the core part of the model."""
