@@ -25,7 +25,27 @@ from motion_metrics import MetricsEngine
 parser = argparse.ArgumentParser()
 
 #python train.py --data_dir data/ --save_dir ./experiments --experiment_name seq2seq
-#python evaluate_test.py --data_dir --save_dir ./experiments --export --model_id 1589985718
+#python evaluate_test.py --data_dir data/ --save_dir ./experiments --export --model_id 1589985718
+
+
+
+
+# python train.py --data_dir /Users/melvin/Downloads/Exclude_from_Backup/data --save_dir ./experiments --experiment_name seq2seq
+# python evaluate_test.py --data_dir /Users/melvin/Downloads/Exclude_from_Backup/data --save_dir ./experiments --export --model_id
+
+import os
+import time
+import argparse
+import json
+import numpy as np
+import tensorflow as tf
+
+import tf_models as models
+from tf_data import TFRecordMotionDataset
+from constants import Constants as C
+from motion_metrics import MetricsEngine
+
+parser = argparse.ArgumentParser()
 
 # Data
 parser.add_argument('--data_dir', required=True, default='./data', help='Where the data (tfrecords) is stored.')
@@ -35,14 +55,26 @@ parser.add_argument("--seq_length_out", type=int, default=24, help="Number of ou
 
 # Learning
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate.')
-parser.add_argument("--batch_size", type=int, default=16, help="Batch size to use during training.")
+parser.add_argument("--batch_size", type=int, default=64, help="Batch size to use during training.")
+parser.add_argument("--optimizer", type=str, default="adam", help="use sgd or adam optimizer")
+parser.add_argument("--early_stopping_tolerance", type=int, default=20, help="tolerance")
+parser.add_argument("--learning_rate_decay_rate", type=float, default="0.98", help="learning decay rate")
+parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help="steps in which learning rate decay")
 
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
 parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
-parser.add_argument("--cell_size", type=int, default=256, help="RNN cell size.")
-parser.add_argument("--input_hidden_size", type=int, default=None, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--cell_size", type=int, default=512, help="RNN cell size.")
+parser.add_argument("--cell_layers", type=int, default=2, help="number of RNN cell layers")
+parser.add_argument("--input_hidden_size", type=int, default=128, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--input_hidden_layers", type=int, default=1, help="Number of dense layers before rnn cell.")
+parser.add_argument("--output_hidden_layers", type=int, default=1, help="Number of dense layers before output")
+parser.add_argument("--output_hidden_size", type=int, default=64, help="size of output dense layers")
+parser.add_argument("--input_dropout_rate", type=float, default=0.1, help="Dropout rate for input layer.")
 parser.add_argument("--activation_fn", type=str, default=None, help="Activation Function on the output.")
+parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
+parser.add_argument("--spl_dropout", action="store_true", help="use dropout between spl predictions")
+parser.add_argument("--spl_dropout_rate", type=float, default=0.1, help="Dropout rate for spl layers")
 
 # Training
 parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
@@ -50,6 +82,8 @@ parser.add_argument("--print_every", type=int, default=100, help="How often to l
 parser.add_argument("--test_every", type=int, default=200, help="How often to compute the error on the validation set.")
 parser.add_argument("--use_cpu", action="store_true", help="Use CPU instead of GPU.")
 parser.add_argument("--experiment_name", type=str, default=None, help="A descriptive name for the experiment.")
+
+
 
 
 ARGS = parser.parse_args()
@@ -259,6 +293,10 @@ def train():
         train_iter = train_data.get_iterator()
         valid_iter = valid_data.get_iterator()
 
+        # Early Stopping
+        stopping_step = 0
+        best_loss = np.inf
+
         print("Running Training Loop.")
         # Initialize the data iterators.
         sess.run(train_iter.initializer)
@@ -307,7 +345,6 @@ def train():
                         print("Train [{:04d}] \t Loss: {:.3f} \t time/batch: {:.3f}".format(step,
                                                                                             train_loss_avg,
                                                                                             time_elapsed))
-
                 except tf.errors.OutOfRangeError:
                     sess.run(train_iter.initializer)
                     epoch += 1
@@ -331,9 +368,24 @@ def train():
             metrics_engine.reset()
             sess.run(valid_iter.initializer)
 
+            valid_loss = valid_metrics["joint_angle"].sum()
+
+            if valid_loss < best_loss:
+                stopping_step = 0
+            else:
+                stopping_step += 1
+
+            if stopping_step == ARGS.early_stopping_tolerance:
+                stop_signal = True
+
             # Save the model. You might want to think about if it's always a good idea to do that.
-            print("Saving the model to {}".format(experiment_dir))
-            saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')), global_step=step-1)
+            # yes not the best idea to save model everytime, instead we save it only if validation loss improves
+            if valid_loss <= best_loss:
+                best_loss = valid_loss
+                print("Saving the model to {}".format(experiment_dir))
+                print(sess.graph_def.ByteSize())
+                saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')),
+                           write_meta_graph=False, global_step=step-1)
 
         print("End of Training.")
 
