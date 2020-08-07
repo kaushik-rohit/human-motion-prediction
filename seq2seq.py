@@ -192,8 +192,19 @@ class seq2seq(BaseModel):
             Prediction with shape (batch_size, self.target_seq_len, feature_size), seed sequence and unique sample IDs.
         """
         # `sampled_step` is written such that it works when no ground-truth data is available, too.
-        predictions, _, seed, data_id = self.sampled_step(session)
-        return predictions, seed, data_id
+        #predictions, _, seed, data_id = self.sampled_step(session)
+
+        #return predictions, seed, data_id
+
+        batch = session.run(self.data_placeholders)
+        data_id = batch[C.BATCH_ID]
+        data_sample = batch[C.BATCH_INPUT]
+        targets = data_sample[:, self.source_seq_len:]
+
+        # Get the model state by feeding the seed sequence.
+        seed_sequence = data_sample[:, :self.source_seq_len]
+        predictions = self.sample(session, seed_sequence, prediction_steps=self.target_seq_len)
+        return predictions, seed_sequence, data_id
 
     def sample(self, session, seed_sequence, prediction_steps):
         """
