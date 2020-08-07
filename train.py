@@ -370,6 +370,9 @@ def train():
 
             valid_loss = valid_metrics["joint_angle"].sum()
 
+
+            with open(os.path.normpath(os.path.join(experiment_dir, EXPERIMENT_TIMESTAMP+"_validloss.txt")), "a+") as myfile:
+                myfile.write("{} valid loss: {} \n".format(step, valid_loss))
             if valid_loss < best_loss:
                 stopping_step = 0
             else:
@@ -395,6 +398,7 @@ def train():
         print("Valid [{:04d}] \t {} \t total_time: {:.3f}".format(step - 1,
                                                                   metrics_engine.get_summary_string(valid_metrics),
                                                                   valid_time))
+
 
         print("Training Finished.")
 
