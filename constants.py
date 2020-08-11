@@ -23,6 +23,7 @@ class Constants(object):
     # Recurrent cells.
     LSTM = 'lstm'
     GRU = 'gru'
+    BLSTM = 'blstm'
 
     # Data Batch.
     BATCH_SEQ_LEN = "seq_len"
@@ -32,6 +33,10 @@ class Constants(object):
 
     # Activation functions.
     RELU = 'relu'
+
+    # Optimization
+    OPTIMIZER_ADAM = "adam"
+    OPTIMIZER_SGD = "sgd"
 
     # Metrics.
     METRIC_TARGET_LENGTHS = [5, 10, 19, 24, 34, 60]  # @ 60 fps, in ms: 83.3, 166.7, 316.7, 400, 566.7, 1000

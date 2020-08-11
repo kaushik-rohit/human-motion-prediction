@@ -63,6 +63,8 @@ def create_and_restore_test_model(session, experiment_dir, args):
     # Select the type of model we want to use.
     if config['model_type'] == "dummy":
         model_cls = models.DummyModel
+    elif config['model_type'] == "rnn_spl":
+        model_cls = models.RNNSPLModel
     else:
         raise Exception("Unknown model type.")
 
@@ -122,9 +124,13 @@ def evaluate_model(sess, eval_model, eval_data):
             # as there is no ground-truth for the test set.
             prediction, seed_sequence, data_id = eval_model.predict(sess)
 
+            # unnormalize to get back to rotation matrices
+            p = eval_data.undo_preprocessing({"poses": prediction})['poses']
+            s = eval_data.undo_preprocessing({"poses": seed_sequence})['poses']
+
             # Store each test sample and corresponding predictions with the unique sample IDs.
             for i in range(prediction.shape[0]):
-                eval_result[data_id[i].decode("utf-8")] = (prediction[i], seed_sequence[i])
+                eval_result[data_id[i].decode("utf-8")] = (p[i], s[i])
     except tf.errors.OutOfRangeError:
         pass
     return eval_result

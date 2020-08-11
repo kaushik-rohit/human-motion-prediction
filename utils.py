@@ -14,6 +14,9 @@ import pandas as pd
 import tensorflow as tf
 import zipfile
 from constants import Constants as C
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import variable_scope as vs
+from tensorflow.python.util import nest
 
 
 def get_activation_fn(activation=C.RELU):
@@ -86,3 +89,107 @@ def export_results(eval_result, output_file):
         sample_poses.append(eval_result[k][0])
 
     to_csv(output_file, np.stack(sample_poses), sample_file_ids)
+
+
+class CustomMultiRNNCell(tf.nn.rnn_cell.MultiRNNCell):
+    def __init__(self, cells, state_is_tuple=True, intermediate_outputs=True):
+        """
+        Extends tensorflow MultiRNNCell such that outputs of the intermediate cells can be accessed.
+        """
+        super(CustomMultiRNNCell, self).__init__(cells, state_is_tuple)
+        self._intermediate_outputs = intermediate_outputs
+
+    @property
+    def output_size(self):
+        if self._intermediate_outputs:
+            if self._state_is_tuple:
+                return tuple(cell.output_size for cell in self._cells)
+            else:
+                return sum([cell.output_size for cell in self._cells])
+        else:
+            return self._cells[-1].output_size
+
+    def call(self, inputs, state):
+        """Run this multi-layer cell on inputs, starting from state."""
+        cur_state_pos = 0
+        cur_inp = inputs
+        new_states = []
+        new_outputs = []
+        for i, cell in enumerate(self._cells):
+            with vs.variable_scope("cell_%d" % i):
+                if self._state_is_tuple:
+                    if not nest.is_sequence(state):
+                        raise ValueError("Expected state to be a tuple of length %d, but received: %s" % (len(self.state_size), state))
+                    cur_state = state[i]
+                else:
+                    cur_state = array_ops.slice(state, [0, cur_state_pos], [-1, cell.state_size])
+                    cur_state_pos += cell.state_size
+                cur_inp, new_state = cell(cur_inp, cur_state)
+                new_states.append(new_state)
+                new_outputs.append(cur_inp)
+
+        new_states = (tuple(new_states) if self._state_is_tuple else array_ops.concat(new_states, 1))
+        if self._intermediate_outputs:
+            new_outputs = (tuple(new_outputs) if self._state_is_tuple else array_ops.concat(new_outputs, 1))
+            return new_outputs, new_states
+        else:
+            return cur_inp, new_states
+
+
+def get_rnn_cell(**kwargs):
+    """
+    Creates an rnn cell object.
+    Args:
+        **kwargs: must contain `cell_type`, `size` and `num_layers` key-value pairs. `dropout_keep_prob` is optional.
+            `dropout_keep_prob` can be a list of ratios where each cell has different dropout ratio in a stacked
+            architecture. If it is a scalar value, then the whole architecture (either a single cell or stacked cell)
+            has one DropoutWrapper.
+    Returns:
+    """
+    cell_type = kwargs['cell_type']
+    size = kwargs['size']
+    num_layers = kwargs['num_layers']
+    dropout_keep_prob = kwargs.get('dropout_keep_prob', 1.0)
+    intermediate_outputs = kwargs.get('intermediate_outputs', False)
+
+    separate_dropout = False
+    if isinstance(dropout_keep_prob, list) and len(dropout_keep_prob) == num_layers:
+        separate_dropout = True
+
+    if cell_type == C.LSTM:
+        rnn_cell_constructor = tf.contrib.rnn.LSTMCell
+    elif cell_type == C.BLSTM:
+        rnn_cell_constructor = tf.contrib.rnn.LSTMBlockCell
+    elif cell_type.lower() == C.GRU:
+        rnn_cell_constructor = tf.contrib.rnn.GRUCell
+    elif cell_type.lower() == C.LayerNormLSTM.lower():
+        rnn_cell_constructor = tf.contrib.rnn.LayerNormBasicLSTMCell
+    else:
+        raise Exception("Unsupported RNN Cell.")
+
+    rnn_cells = []
+    for i in range(num_layers):
+        cell = rnn_cell_constructor(size)
+        if separate_dropout:
+            cell = tf.contrib.rnn.DropoutWrapper(cell,
+                                                 input_keep_prob=dropout_keep_prob[i],
+                                                 output_keep_prob=dropout_keep_prob,
+                                                 state_keep_prob=1,
+                                                 dtype=tf.float32,
+                                                 seed=1)
+        rnn_cells.append(cell)
+
+    if num_layers > 1:
+        # cell = tf.nn.rnn_cell.MultiRNNCell(cells=rnn_cells, state_is_tuple=True)
+        cell = CustomMultiRNNCell(cells=rnn_cells, state_is_tuple=True, intermediate_outputs=intermediate_outputs)
+    else:
+        cell = rnn_cells[0]
+
+    if separate_dropout and dropout_keep_prob < 1.0:
+        cell = tf.contrib.rnn.DropoutWrapper(cell,
+                                             input_keep_prob=dropout_keep_prob,
+                                             output_keep_prob=dropout_keep_prob,
+                                             state_keep_prob=1,
+                                             dtype=tf.float32,
+                                             seed=1)
+    return cell

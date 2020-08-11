@@ -31,14 +31,28 @@ parser.add_argument("--seq_length_out", type=int, default=24, help="Number of ou
 
 # Learning
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate.')
-parser.add_argument("--batch_size", type=int, default=16, help="Batch size to use during training.")
+parser.add_argument("--batch_size", type=int, default=64, help="Batch size to use during training.")
+parser.add_argument("--optimizer", type=str, default="adam", help="use sgd or adam optimizer")
+parser.add_argument("--early_stopping_tolerance", type=int, default=20, help="tolerance")
+parser.add_argument("--learning_rate_decay_rate", type=float, default="0.98", help="learning decay rate")
+parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help="steps in which learning rate decay")
 
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
 parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
-parser.add_argument("--cell_size", type=int, default=256, help="RNN cell size.")
-parser.add_argument("--input_hidden_size", type=int, default=None, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--cell_size", type=int, default=512, help="RNN cell size.")
+parser.add_argument("--cell_layers", type=int, default=2, help="number of RNN cell layers")
+parser.add_argument("--input_hidden_size", type=int, default=128, help="Input dense layer before the recurrent cell.")
+parser.add_argument("--input_hidden_layers", type=int, default=1, help="Number of dense layers before rnn cell.")
+parser.add_argument("--output_hidden_layers", type=int, default=1, help="Number of dense layers before output")
+parser.add_argument("--output_hidden_size", type=int, default=64, help="size of output dense layers")
+parser.add_argument("--input_dropout_rate", type=float, default=0.1, help="Dropout rate for input layer.")
 parser.add_argument("--activation_fn", type=str, default=None, help="Activation Function on the output.")
+parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
+parser.add_argument("--spl_dropout", action="store_true", help="use dropout between spl predictions")
+parser.add_argument("--spl_dropout_rate", type=float, default=0.1, help="Dropout rate for spl layers")
+parser.add_argument("--residual_velocity", action="store_true", help="Add a residual connection that effectively models velocities.")
+
 
 # Training
 parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
@@ -66,6 +80,8 @@ def create_model(session):
     # Parse the commandline arguments to a more readable config.
     if ARGS.model_type == "dummy":
         model_cls, config, experiment_name = get_dummy_config(ARGS)
+    elif ARGS.model_type == 'rnn_spl':
+        model_cls, config, experiment_name = get_rnn_spl_config(ARGS)
     else:
         raise Exception("Model type '{}' unknown.".format(ARGS.model_type))
 
@@ -176,6 +192,8 @@ def get_dummy_config(args):
     config['model_type'] = args.model_type
     config['seed'] = C.SEED
     config['learning_rate'] = args.learning_rate
+    config['learning_rate_decay_rate'] = args.learning_rate_decay_rate
+    config['learning_rate_decay_steps'] = args.learning_rate_decay_steps
     config['cell_type'] = args.cell_type
     config['cell_size'] = args.cell_size
     config['input_hidden_size'] = args.input_hidden_size
@@ -183,8 +201,61 @@ def get_dummy_config(args):
     config['target_seq_len'] = args.seq_length_out
     config['batch_size'] = args.batch_size
     config['activation_fn'] = args.activation_fn
+    config['optimizer'] = args.optimizer
 
     model_cls = models.DummyModel
+
+    # Create an experiment name that summarizes the configuration.
+    # It will be used as part of the experiment folder name.
+    experiment_name_format = "{}-{}{}-b{}-{}@{}-in{}_out{}"
+    experiment_name = experiment_name_format.format(EXPERIMENT_TIMESTAMP,
+                                                    args.model_type,
+                                                    "-"+args.experiment_name if args.experiment_name is not None else "",
+                                                    config['batch_size'],
+                                                    config['cell_size'],
+                                                    config['cell_type'],
+                                                    args.seq_length_in,
+                                                    args.seq_length_out)
+    return model_cls, config, experiment_name
+
+
+def get_rnn_spl_config(args):
+    """
+    Create a config from the parsed commandline arguments that is more readable. You can use this to define more
+    parameters and their default values.
+    Args:
+        args: The parsed commandline arguments.
+
+    Returns:
+        The model class, the config, and the experiment name.
+    """
+    assert args.model_type == "rnn_spl"
+
+    config = dict()
+    config['model_type'] = args.model_type
+    config['seed'] = C.SEED
+    config['learning_rate'] = args.learning_rate
+    config['learning_rate_decay_rate'] = args.learning_rate_decay_rate
+    config['learning_rate_decay_steps'] = args.learning_rate_decay_steps
+    config['cell_type'] = args.cell_type
+    config['cell_size'] = args.cell_size
+    config['cell_layers'] = args.cell_layers
+    config['input_hidden_size'] = args.input_hidden_size
+    config['input_hidden_layers'] = args.input_hidden_layers
+    config['output_hidden_size'] = args.output_hidden_size
+    config['output_hidden_layers'] = args.output_hidden_layers
+    config['input_dropout_rate'] = args.input_dropout_rate
+    config['joint_prediction_layer'] = args.joint_prediction_layer
+    config['source_seq_len'] = args.seq_length_in
+    config['target_seq_len'] = args.seq_length_out
+    config['batch_size'] = args.batch_size
+    config['activation_fn'] = args.activation_fn
+    config['optimizer'] = args.optimizer
+    config['spl_dropout'] = args.spl_dropout
+    config['spl_dropout_rate'] = args.spl_dropout_rate
+    config['residual_velocity'] = args.residual_velocity
+
+    model_cls = models.RNNSPLModel
 
     # Create an experiment name that summarizes the configuration.
     # It will be used as part of the experiment folder name.
@@ -237,6 +308,10 @@ def train():
         train_iter = train_data.get_iterator()
         valid_iter = valid_data.get_iterator()
 
+        # Early Stopping
+        stopping_step = 0
+        best_loss = np.inf
+
         print("Running Training Loop.")
         # Initialize the data iterators.
         sess.run(train_iter.initializer)
@@ -252,14 +327,24 @@ def train():
                 while True:
                     # get the predictions and ground truth values
                     predictions, targets, seed_sequence, data_id = _eval_model.sampled_step(sess)
-                    _metrics_engine.compute_and_aggregate(predictions, targets)
+
+                    # unnormalize to get back to rotation matrices
+                    p = train_data.undo_preprocessing({"poses": predictions})['poses']
+                    t = train_data.undo_preprocessing({"poses": targets})['poses']
+
+                    # _metrics_engine.compute_and_aggregate(predictions, targets)
+                    _metrics_engine.compute_and_aggregate(p, t)
 
                     if _return_results:
                         # Store each test sample and corresponding predictions with the unique sample IDs.
                         for k in range(predictions.shape[0]):
-                            _eval_result[data_id[k].decode("utf-8")] = (predictions[k],
-                                                                        targets[k],
-                                                                        seed_sequence["poses"][k])
+                            s = train_data.undo_preprocessing({"poses": seed_sequence})['poses']
+                            _eval_result[data_id[k].decode("utf-8")] = (p[k],
+                                                                        t['poses'][k],
+                                                                        s["poses"][k])
+                            # _eval_result[data_id[k].decode("utf-8")] = (predictions[k],
+                            #                                             targets[k],
+                            #                                             seed_sequence[k])
 
             except tf.errors.OutOfRangeError:
                 # finalize the computation of the metrics
@@ -285,7 +370,6 @@ def train():
                         print("Train [{:04d}] \t Loss: {:.3f} \t time/batch: {:.3f}".format(step,
                                                                                             train_loss_avg,
                                                                                             time_elapsed))
-
                 except tf.errors.OutOfRangeError:
                     sess.run(train_iter.initializer)
                     epoch += 1
@@ -309,9 +393,28 @@ def train():
             metrics_engine.reset()
             sess.run(valid_iter.initializer)
 
+            valid_loss = valid_metrics["joint_angle"].sum()
+
+            with open(os.path.normpath(os.path.join(experiment_dir, EXPERIMENT_TIMESTAMP + "_validloss.txt")),
+                      "a+") as myfile:
+                myfile.write("{} valid loss: {} \n".format(step-1, valid_loss))
+
+            if valid_loss < best_loss:
+                stopping_step = 0
+            else:
+                stopping_step += 1
+
+            if stopping_step == ARGS.early_stopping_tolerance:
+                stop_signal = True
+
             # Save the model. You might want to think about if it's always a good idea to do that.
-            print("Saving the model to {}".format(experiment_dir))
-            saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')), global_step=step-1)
+            # yes not the best idea to save model everytime, instead we save it only if validation loss improves
+            if valid_loss <= best_loss:
+                best_loss = valid_loss
+                print("Saving the model to {}".format(experiment_dir))
+                print(sess.graph_def.ByteSize())
+                saver.save(sess, os.path.normpath(os.path.join(experiment_dir, 'checkpoint')),
+                           write_meta_graph=False, global_step=step-1)
 
         print("End of Training.")
 
