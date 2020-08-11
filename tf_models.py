@@ -326,6 +326,7 @@ class RNNSPLModel(BaseModel):
         self.cell_size = self.config["cell_size"]
         self.input_hidden_size = self.config.get("input_hidden_size")
         self.joint_prediction_layer = self.config["joint_prediction_layer"]
+        self.residual_velocity = self.config.get("residual_velocity", False)
 
         # Prepare some members that need to be set when creating the graph.
         self.cell = None  # The recurrent cell.
@@ -365,6 +366,8 @@ class RNNSPLModel(BaseModel):
         Returns:
             predicted pose sequence: A tensor or (batch_size, seq_len, pose_size)
         """
+
+        # add residual connection here
         if self.joint_prediction_layer == "plain":
             # Create a number of hidden layers and predict the full pose vector.
             with tf.variable_scope('output_layer', reuse=self.reuse):
@@ -389,6 +392,8 @@ class RNNSPLModel(BaseModel):
                                is_training=self.is_training,
                                reuse=self.reuse)
                 pose_prediction = sp_layer.build(inputs)
+        if self.residual_velocity:
+            pose_prediction += self.prediction_inputs[:, 0:tf.shape(pose_prediction)[1], :self.HUMAN_SIZE]
 
         return pose_prediction
 

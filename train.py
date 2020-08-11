@@ -51,6 +51,8 @@ parser.add_argument("--activation_fn", type=str, default=None, help="Activation 
 parser.add_argument("--joint_prediction_layer", type=str, default="spl", help="output layer plain, spl or spl sparse")
 parser.add_argument("--spl_dropout", action="store_true", help="use dropout between spl predictions")
 parser.add_argument("--spl_dropout_rate", type=float, default=0.1, help="Dropout rate for spl layers")
+parser.add_argument("--residual_velocity", action="store_true", help="Add a residual connection that effectively models velocities.")
+
 
 # Training
 parser.add_argument("--num_epochs", type=int, default=5, help="Number of training epochs.")
@@ -251,6 +253,7 @@ def get_rnn_spl_config(args):
     config['optimizer'] = args.optimizer
     config['spl_dropout'] = args.spl_dropout
     config['spl_dropout_rate'] = args.spl_dropout_rate
+    config['residual_velocity'] = args.residual_velocity
 
     model_cls = models.RNNSPLModel
 
@@ -391,6 +394,10 @@ def train():
             sess.run(valid_iter.initializer)
 
             valid_loss = valid_metrics["joint_angle"].sum()
+
+            with open(os.path.normpath(os.path.join(experiment_dir, EXPERIMENT_TIMESTAMP + "_validloss.txt")),
+                      "a+") as myfile:
+                myfile.write("{} valid loss: {} \n".format(step-1, valid_loss))
 
             if valid_loss < best_loss:
                 stopping_step = 0
