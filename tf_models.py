@@ -92,6 +92,8 @@ class BaseModel(object):
             optimizer = tf.train.AdamOptimizer(learning_rate)
         elif self.config["optimizer"] == C.OPTIMIZER_SGD:
             optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+        elif self.config["optimizer"] == C.OPTIMIZER_ADAGRAD:
+            optimizer = tf.train.AdagradOptimizer(learning_rate)
         else:
             raise Exception("Optimization {} not found.".format(self.config["optimizer"]))
 

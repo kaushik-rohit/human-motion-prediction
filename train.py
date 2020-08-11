@@ -32,7 +32,7 @@ parser.add_argument("--seq_length_out", type=int, default=24, help="Number of ou
 # Learning
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate.')
 parser.add_argument("--batch_size", type=int, default=64, help="Batch size to use during training.")
-parser.add_argument("--optimizer", type=str, default="adam", help="use sgd or adam optimizer")
+parser.add_argument("--optimizer", type=str, default="adam", help="sgd, adam, adagrad")
 parser.add_argument("--early_stopping_tolerance", type=int, default=20, help="tolerance")
 parser.add_argument("--learning_rate_decay_rate", type=float, default="0.98", help="learning decay rate")
 parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help="steps in which learning rate decay")
