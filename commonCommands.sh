@@ -1,5 +1,13 @@
 bsub -n 6 -W 4:00 -R "rusage[mem=1024, ngpus_excl_p=1]" python train.py --data_dir /cluster/project/infk/hilliges/lectures/mp20/project4 --save_dir ./experiments --experiment_name sample
 
+#1597236108 (online:3.1245266 ) #adagrad Optimizer
+
+bsub -n 6 -W 24:00 -R "rusage[mem=8192, ngpus_excl_p=1]" python train.py --data_dir /cluster/project/infk/hilliges/lectures/mp20/project4 --save_dir ./experiments  
+--model_type rnn_spl --optimizer adagrad --spl_dropout --spl_dropout_rate 0.0 --input_hidden_size 256 --input_hidden_layers 1 --output_hidden_layers 1 
+--output_hidden_size 128 --input_dropout_rate 0.05 --num_epochs 1000 --experiment_name rnnspl --learning_rate_decay_rate 0.93 
+--residual_velocity --cell_size 1024 --cell_type blstm --early_stopping_tolerance 200
+
+
 
 #1597137370 (valid loss: 2.74) and 1597136472 (valid loss: 2.76)
 bsub -n 6 -W 24:00 -R "rusage[mem=1024, ngpus_excl_p=1]" python train.py --data_dir /cluster/project/infk/hilliges/lectures/mp20/project4 \
