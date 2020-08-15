@@ -39,7 +39,7 @@ parser.add_argument("--learning_rate_decay_steps", type=int, default=1000, help=
 
 # Architecture
 parser.add_argument("--model_type", type=str, default="dummy", help="Model to train.")
-parser.add_argument("--cell_type", type=str, default="lstm", help="RNN cell type: lstm, gru")
+parser.add_argument("--cell_type", type=str, default="lstm, gru, blstm", help="RNN cell type: lstm, gru")
 parser.add_argument("--cell_size", type=int, default=512, help="RNN cell size.")
 parser.add_argument("--cell_layers", type=int, default=2, help="number of RNN cell layers")
 parser.add_argument("--input_hidden_size", type=int, default=128, help="Input dense layer before the recurrent cell.")
