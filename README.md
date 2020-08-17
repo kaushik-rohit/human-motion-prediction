@@ -19,3 +19,7 @@ and evaluate with:
 ```bash
 bsub -n 6 -W 4:00 -R "rusage[mem=1024, ngpus_excl_p=1]" -o outvalidate.txt python evaluate_test.py --data_dir /cluster/project/infk/hilliges/lectures/mp20/project4 --save_dir ./experiments --model_id <model_id> --export
 ```
+
+## Notes
+
+Make sure to **not** use a GTX 1080 on the cluster as this lead to problems in our experience

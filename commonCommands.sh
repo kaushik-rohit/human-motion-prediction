@@ -80,4 +80,4 @@ bsub -n 6 -W 24:00 -R "rusage[mem=8192, ngpus_excl_p=1]" -R "select[gpu_model0==
 
 
 
-bsub -n 6 -W 1:00 -R "rusage[mem=1024, ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX2080Ti]" -o outvalidate.txt python evaluate_test.py --data_dir /cluster/project/infk/hilliges/lectures/mp20/project4 --save_dir ./experiments --model_id 1597650923 --export --visualize
+bsub -n 6 -W 1:00 -R "rusage[mem=1024, ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -o outvalidate.txt python evaluate_test.py --data_dir /cluster/project/infk/hilliges/lectures/mp20/project4 --save_dir ./experiments --model_id 1597650923 --export --visualize
